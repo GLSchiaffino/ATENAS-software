@@ -1,6 +1,6 @@
 -- ================================================================
 -- ATENAS — Sistema de Información
--- Esquema de Base de Datos v1.0  |  PostgreSQL 15+
+-- Esquema de Base de Datos v1.1  |  PostgreSQL 15+
 -- Proyecto Final UTN — Ingeniería de Software
 -- ================================================================
 --
@@ -14,6 +14,15 @@
 --
 -- Orden de creación respeta dependencias entre tablas.
 -- La referencia circular equipo ↔ usuario se resuelve con FK DEFERRABLE.
+--
+-- Cambios v1.1 (Dashboard operacional):
+--   · ENUM comision_tipo    → nuevo valor BONO_RECORD
+--   · ENUM inscripcion_tipo → nuevo tipo (MANUAL, AUTO_VENTA)
+--   · equipo                → campo emoji
+--   · usuario               → campos emoji_personal, meta_ventas_default,
+--                             record_ventas_dia
+--   · NUEVO CLUSTER 4.5     → tabla jornada_diaria
+--   · Índices               → nuevos índices para dashboard
 -- ================================================================
 
 -- ----------------------------------------------------------------
@@ -54,7 +63,9 @@ CREATE TYPE movimiento_tipo      AS ENUM (
 );
 
 CREATE TYPE comision_tipo        AS ENUM (
-    'VENDEDOR_INDIVIDUAL', 'LIDER_EQUIPO', 'BONO_FIN_SEMANA'
+    'VENDEDOR_INDIVIDUAL', 'LIDER_EQUIPO',
+    'BONO_FIN_SEMANA',     -- cada 5 ventas en sábado/domingo (RN-035)
+    'BONO_RECORD'          -- v1.1: bono por superar récord histórico personal del día
 );
 
 CREATE TYPE notificacion_tipo    AS ENUM ('VENTA_FUERA_CAMPANA');
@@ -69,6 +80,12 @@ CREATE TYPE auditoria_operacion  AS ENUM (
 -- V2
 CREATE TYPE juego_tipo           AS ENUM ('FOTOS_CLIENTES', 'ROBOS', 'POZO_DEL_DIA');
 CREATE TYPE juego_estado         AS ENUM ('ABIERTO', 'CERRADO');
+
+-- v1.1 — Dashboard operacional
+CREATE TYPE inscripcion_tipo     AS ENUM (
+    'MANUAL',       -- el vendedor se inscribió al dashboard antes de vender
+    'AUTO_VENTA'    -- se inscribió automáticamente al registrar su primera venta del día
+);
 
 
 -- ================================================================
@@ -113,6 +130,9 @@ CREATE TABLE punto_de_venta (
 CREATE TABLE equipo (
     id       UUID              PRIMARY KEY DEFAULT gen_random_uuid(),
     nombre   VARCHAR(150)      NOT NULL,
+    -- v1.1: emoji identificador visible en el dashboard (ej: 🔥, 🦅)
+    -- NULL válido para equipos administrativos que no aparecen en el dashboard
+    emoji    VARCHAR(10),
     tipo     equipo_categoria  NOT NULL,
     -- lider_id: NULL para equipos administrativos; obligatorio para CAMPO
     lider_id UUID,
@@ -131,6 +151,13 @@ CREATE TABLE usuario (
     password_hash  VARCHAR(255) NOT NULL,
     rol            usuario_rol  NOT NULL,
     equipo_id      UUID         NOT NULL REFERENCES equipo(id),
+    -- v1.1: campos de dashboard — solo relevantes para vendedores de campo.
+    -- NULL válido para usuarios de oficina (secretario, tesorero, etc.)
+    emoji_personal      VARCHAR(10)  UNIQUE,          -- elegido por el vendedor, único en todo ATENAS
+    meta_ventas_default INTEGER      DEFAULT 10
+                        CHECK (meta_ventas_default > 0),
+    record_ventas_dia   INTEGER      NOT NULL DEFAULT 0
+                        CHECK (record_ventas_dia >= 0), -- máximo de ventas en un día (editable para datos históricos previos al sistema)
     activo         BOOLEAN      NOT NULL DEFAULT TRUE,
     fecha_creacion TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     ultimo_acceso  TIMESTAMPTZ
@@ -309,6 +336,39 @@ CREATE TABLE asignacion_equipo_punto (
     -- Un equipo no puede estar asignado dos veces al mismo PDV en la misma semana
     CONSTRAINT uq_asignacion_por_semana
         UNIQUE (equipo_id, punto_de_venta_id, semana_laboral_id)
+);
+
+
+-- ================================================================
+-- CLUSTER 4.5 — DASHBOARD OPERACIONAL  (v1.1)
+-- Registra la actividad diaria de cada vendedor en el dashboard.
+-- Es el eje del display en tiempo real (polling V1, WebSockets V2).
+--
+-- Relación con otros clusters:
+--   · venta            → cada venta del día incrementa el contador
+--   · registro_comision→ los bonos BONO_FIN_SEMANA y BONO_RECORD
+--                        generan el emoji 🎁 en el dashboard
+--   · usuario          → emoji_personal, meta_ventas_default,
+--                        record_ventas_dia (campos agregados en v1.1)
+-- ================================================================
+
+CREATE TABLE jornada_diaria (
+    id                   UUID               PRIMARY KEY DEFAULT gen_random_uuid(),
+    vendedor_id          UUID               NOT NULL REFERENCES usuario(id),
+    fecha                DATE               NOT NULL,
+    -- Meta del día: arranca con el valor de usuario.meta_ventas_default
+    -- pero puede editarse para esta jornada específica
+    meta_ventas          INTEGER            NOT NULL CHECK (meta_ventas > 0),
+    tipo_inscripcion     inscripcion_tipo   NOT NULL DEFAULT 'AUTO_VENTA',
+    -- Flag anti-duplicado para BONO_RECORD:
+    -- TRUE = ya se generó el bono por superar el récord hoy.
+    -- Impide dar un segundo BONO_RECORD si el vendedor sigue sumando ventas
+    -- por encima del récord en la misma jornada.
+    record_superado_hoy  BOOLEAN            NOT NULL DEFAULT FALSE,
+    fecha_inscripcion    TIMESTAMPTZ        NOT NULL DEFAULT NOW(),
+    -- Un único registro por vendedor por día
+    CONSTRAINT uq_jornada_vendedor_fecha
+        UNIQUE (vendedor_id, fecha)
 );
 
 
@@ -584,3 +644,15 @@ CREATE INDEX idx_juego_encargado          ON juego(encargado_id);
 CREATE INDEX idx_registro_juego_juego     ON registro_juego(juego_id);
 CREATE INDEX idx_registro_juego_vendedor  ON registro_juego(vendedor_id);
 CREATE INDEX idx_premio_juego             ON premio_juego(juego_id);
+
+-- ---- Dashboard operacional (v1.1) ------------------------------
+CREATE INDEX idx_jornada_vendedor         ON jornada_diaria(vendedor_id);
+CREATE INDEX idx_jornada_fecha            ON jornada_diaria(fecha DESC);
+-- Query central del dashboard: vendedor + fecha (UNIQUE ya actúa como índice,
+-- pero este compuesto cubre la dirección de búsqueda más frecuente)
+CREATE INDEX idx_jornada_vendedor_fecha   ON jornada_diaria(vendedor_id, fecha DESC);
+-- Query frecuente: contar 🎁 del día por vendedor
+-- beneficiario_id + tipo + fecha_calculo cubre el filtro del dashboard
+CREATE INDEX idx_regcom_bonos_beneficiario
+    ON registro_comision(beneficiario_id, tipo, fecha_calculo DESC)
+    WHERE tipo IN ('BONO_FIN_SEMANA', 'BONO_RECORD');

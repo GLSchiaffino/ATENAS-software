@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ATENAS — Sistema de Información</title>
+  <style>
+    :root {
+      --bg:#080D1A; --surface:#111827; --surface2:#1E2A3A;
+      --blue:#3B82F6; --blue-dim:#1D4ED8; --purple:#8B5CF6;
+      --green:#10B981; --amber:#F59E0B; --red:#EF4444;
+      --text:#F1F5F9; --muted:#94A3B8; --border:rgba(255,255,255,0.08);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+         background:var(--bg);color:var(--text);height:100vh;overflow:hidden;user-select:none;}
+    .deck{width:100%;height:100vh;position:relative;}
+    .slide{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;
+           align-items:center;padding:52px 68px;opacity:0;transform:translateX(40px);
+           transition:opacity .4s ease,transform .4s ease;pointer-events:none;text-align:center;}
+    .slide.active{opacity:1;transform:translateX(0);pointer-events:all;}
+    .slide.exit{opacity:0;transform:translateX(-40px);}
+    .nav{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
+         display:flex;align-items:center;gap:14px;z-index:100;}
+    .nav-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);
+             width:38px;height:38px;border-radius:50%;cursor:pointer;font-size:16px;
+             display:flex;align-items:center;justify-content:center;transition:background .2s,border-color .2s;}
+    .nav-btn:hover{background:var(--blue-dim);border-color:var(--blue);}
+    .dots{display:flex;gap:7px;}
+    .dot{width:7px;height:7px;border-radius:50%;background:var(--surface2);
+         border:1px solid var(--border);cursor:pointer;transition:background .2s,transform .2s;}
+    .dot.active{background:var(--blue);transform:scale(1.4);}
+    .slide-counter{position:fixed;top:22px;right:28px;font-size:13px;color:var(--muted);letter-spacing:1px;}
+    .badge{display:inline-flex;align-items:center;gap:6px;background:rgba(59,130,246,.12);
+           border:1px solid rgba(59,130,246,.3);color:var(--blue);padding:4px 14px;border-radius:20px;
+           font-size:12px;font-weight:600;letter-spacing:.5px;margin-bottom:18px;}
+    h1{font-size:clamp(30px,4.5vw,50px);font-weight:800;line-height:1.15;}
+    h2{font-size:clamp(22px,3.2vw,36px);font-weight:700;line-height:1.2;}
+    .accent{color:var(--blue);} .accent-purple{color:var(--purple);}
+    .accent-green{color:var(--green);} .accent-amber{color:var(--amber);}
+    .divider{width:56px;height:3px;background:linear-gradient(90deg,var(--blue),var(--purple));
+             border-radius:2px;margin:16px auto;}
+    p{font-size:clamp(14px,1.5vw,17px);color:var(--muted);line-height:1.7;}
+
+    /* ── S1 PORTADA ── */
+    #s1{background:radial-gradient(ellipse at 60% 40%,rgba(59,130,246,.12) 0%,transparent 60%),
+        radial-gradient(ellipse at 30% 70%,rgba(139,92,246,.10) 0%,transparent 50%),var(--bg);}
+    .logo-ring{width:84px;height:84px;border-radius:50%;
+               background:linear-gradient(135deg,var(--blue),var(--purple));
+               display:flex;align-items:center;justify-content:center;font-size:34px;
+               margin:0 auto 24px;box-shadow:0 0 40px rgba(59,130,246,.35);}
+    .tags{display:flex;gap:10px;justify-content:center;margin-top:28px;flex-wrap:wrap;}
+    .tag{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+         padding:5px 14px;font-size:12px;color:var(--muted);}
+
+    /* ── S2 PROBLEMAS ── */
+    #s2{text-align:left;align-items:flex-start;}
+    .problem-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%;margin-top:22px;}
+    .problem-card{background:var(--surface);border:1px solid rgba(239,68,68,.2);
+                  border-left:3px solid var(--red);border-radius:12px;padding:16px 18px;
+                  display:flex;align-items:flex-start;gap:12px;text-align:left;}
+    .problem-icon{font-size:22px;flex-shrink:0;margin-top:2px;}
+    .problem-card strong{display:block;font-size:14px;color:var(--text);margin-bottom:3px;}
+    .problem-card span{font-size:12px;color:var(--muted);line-height:1.5;}
+
+    /* ── S3 SOLUCIÓN ── */
+    #s3{background:radial-gradient(ellipse at 50% 50%,rgba(16,185,129,.08) 0%,transparent 65%),var(--bg);}
+    .solution-pillars{display:flex;gap:16px;margin-top:30px;flex-wrap:wrap;justify-content:center;}
+    .pillar{background:var(--surface);border:1px solid var(--border);border-radius:16px;
+            padding:22px 18px;width:170px;text-align:center;}
+    .pillar .p-icon{font-size:30px;margin-bottom:10px;}
+    .pillar .p-label{font-size:13px;font-weight:600;color:var(--text);}
+
+    /* ── S4 AVANCE ── */
+    #s4{text-align:left;align-items:flex-start;}
+    .phase-list{width:100%;margin-top:24px;display:flex;flex-direction:column;gap:10px;}
+    .phase-row{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+               padding:14px 20px;display:flex;align-items:center;gap:16px;}
+    .phase-row.done{border-color:rgba(16,185,129,.3);}
+    .phase-row.in-progress{border-color:rgba(245,158,11,.3);}
+    .phase-status{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;
+                  justify-content:center;font-size:13px;flex-shrink:0;}
+    .phase-row.done .phase-status{background:rgba(16,185,129,.15);color:var(--green);}
+    .phase-row.in-progress .phase-status{background:rgba(245,158,11,.15);color:var(--amber);}
+    .phase-row.pending .phase-status{background:var(--surface2);color:var(--muted);}
+    .phase-info{flex:1;}
+    .phase-info strong{display:block;font-size:14px;color:var(--text);}
+    .phase-info span{font-size:12px;color:var(--muted);}
+    .phase-badge{font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:.5px;}
+    .phase-row.done .phase-badge{background:rgba(16,185,129,.1);color:var(--green);}
+    .phase-row.in-progress .phase-badge{background:rgba(245,158,11,.1);color:var(--amber);}
+    .phase-row.pending .phase-badge{background:var(--surface2);color:var(--muted);}
+
+    /* ── S5 VENTAJA ── */
+    #s5{background:radial-gradient(ellipse at 70% 30%,rgba(139,92,246,.10) 0%,transparent 60%),var(--bg);}
+    .advantage-cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:28px;width:100%;}
+    .adv-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;
+              padding:24px 20px;text-align:left;}
+    .adv-card .adv-icon{font-size:32px;margin-bottom:12px;}
+    .adv-card h3{font-size:16px;margin-bottom:6px;}
+    .adv-card p{font-size:13px;}
+    .adv-highlight{background:linear-gradient(135deg,rgba(59,130,246,.12),rgba(139,92,246,.12));
+                   border-color:rgba(139,92,246,.3);}
+
+    /* ── S6 MAPA DEL SISTEMA ── */
+    #s6{background:radial-gradient(ellipse at 50% 50%,rgba(59,130,246,.07) 0%,transparent 70%),var(--bg);}
+    .sys-map{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;width:100%;margin-top:22px;}
+    .sys-module{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+                padding:14px 14px;text-align:left;transition:border-color .2s;}
+    .sys-module:hover{border-color:rgba(59,130,246,.4);}
+    .sm-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+    .sm-icon{font-size:18px;}
+    .sm-name{font-size:13px;font-weight:700;color:var(--text);}
+    .sm-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+    .sm-entities{display:flex;flex-direction:column;gap:3px;}
+    .sm-entity{font-size:11px;color:var(--muted);padding-left:4px;
+               border-left:2px solid var(--border);}
+    .sm-entity.highlight{color:var(--text);border-color:currentColor;}
+    .col-ops{--dot-color:var(--blue);}
+    .col-fin{--dot-color:var(--green);}
+    .col-eng{--dot-color:var(--amber);}
+    .col-adm{--dot-color:var(--purple);}
+    .sys-module .sm-dot{background:var(--dot-color,var(--blue));}
+    .map-legend{display:flex;gap:20px;justify-content:center;margin-top:14px;flex-wrap:wrap;}
+    .legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);}
+    .legend-dot{width:8px;height:8px;border-radius:50%;}
+
+    /* ── S7 ANTES / DESPUÉS ── */
+    #s7{text-align:left;align-items:flex-start;}
+    .ad-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;margin-top:20px;}
+    .ad-row{display:contents;}
+    .ad-cell{background:var(--surface);border-radius:10px;padding:14px 16px;
+             display:flex;align-items:flex-start;gap:10px;}
+    .ad-cell.before{border:1px solid rgba(239,68,68,.2);border-left:3px solid var(--red);}
+    .ad-cell.after{border:1px solid rgba(16,185,129,.2);border-left:3px solid var(--green);}
+    .ad-label{font-size:10px;font-weight:700;letter-spacing:1px;
+              display:block;margin-bottom:4px;opacity:.7;}
+    .ad-cell.before .ad-label{color:var(--red);}
+    .ad-cell.after .ad-label{color:var(--green);}
+    .ad-cell p{font-size:12px;color:var(--text);line-height:1.5;margin:0;}
+    .ad-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
+    .ad-header{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+    .ad-col-title{font-size:11px;font-weight:700;letter-spacing:1.5px;
+                  text-align:center;padding:6px;border-radius:6px;}
+    .ad-col-title.b{background:rgba(239,68,68,.08);color:var(--red);}
+    .ad-col-title.a{background:rgba(16,185,129,.08);color:var(--green);}
+
+    /* ── S8 DASHBOARD ── */
+    #s8{background:radial-gradient(ellipse at 40% 60%,rgba(59,130,246,.10) 0%,transparent 60%),var(--bg);}
+    .dash-preview{background:var(--surface);border:1px solid var(--border);border-radius:16px;
+                  padding:20px 26px;width:100%;max-width:660px;margin-top:24px;text-align:left;}
+    .dash-team-header{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1.5px;
+                      margin-bottom:12px;text-transform:uppercase;}
+    .dash-vendor{display:flex;align-items:center;padding:10px 0;
+                 border-bottom:1px solid var(--border);gap:14px;}
+    .dash-vendor:last-child{border-bottom:none;}
+    .dv-name{font-weight:600;font-size:14px;min-width:120px;}
+    .dv-meta{font-size:11px;color:var(--muted);min-width:58px;}
+    .dv-emojis{font-size:17px;letter-spacing:1.5px;flex:1;}
+    .dv-record{font-size:11px;color:var(--muted);text-align:right;}
+
+    /* ── S9 V2 ── */
+    #s9{background:radial-gradient(ellipse at 50% 30%,rgba(245,158,11,.07) 0%,transparent 60%),var(--bg);}
+    .v2-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:28px;width:100%;}
+    .v2-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+             padding:22px 16px;text-align:center;}
+    .v2-card .v2-icon{font-size:32px;margin-bottom:10px;}
+    .v2-card h3{font-size:15px;margin-bottom:5px;}
+    .v2-card p{font-size:12px;}
+    .v2-coming{font-size:10px;color:var(--amber);font-weight:700;letter-spacing:.5px;margin-top:8px;
+               background:rgba(245,158,11,.1);padding:3px 10px;border-radius:20px;display:inline-block;}
+
+    /* ── S10 COMPARACIÓN ── */
+    .compare-wrap{display:grid;grid-template-columns:1fr auto 1fr;gap:18px;
+                  align-items:center;margin-top:28px;width:100%;}
+    .cmp-col{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:26px 22px;text-align:left;}
+    .cmp-col.highlight{background:linear-gradient(135deg,rgba(59,130,246,.10),rgba(139,92,246,.10));border-color:rgba(59,130,246,.4);}
+    .cmp-col .cmp-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:16px;}
+    .cmp-col.slow .cmp-title{color:var(--red);}
+    .cmp-col.fast .cmp-title{color:var(--green);}
+    .cmp-item{display:flex;align-items:flex-start;gap:8px;padding:7px 0;
+              border-bottom:1px solid var(--border);font-size:13px;}
+    .cmp-item:last-child{border-bottom:none;}
+    .cmp-item .ci-label{color:var(--muted);flex:1;}
+    .cmp-item .ci-val{font-weight:700;}
+    .cmp-col.slow .cmp-item .ci-val{color:var(--red);}
+    .cmp-col.fast .cmp-item .ci-val{color:var(--green);}
+    .vs-badge{width:44px;height:44px;border-radius:50%;background:var(--surface2);
+              border:1px solid var(--border);display:flex;align-items:center;justify-content:center;
+              font-size:12px;font-weight:800;color:var(--muted);flex-shrink:0;}
+
+    /* ── S11 PROPUESTA COLABORACIÓN ── */
+    #s11{background:radial-gradient(ellipse at 30% 50%,rgba(139,92,246,.12) 0%,transparent 60%),
+         radial-gradient(ellipse at 70% 50%,rgba(16,185,129,.08) 0%,transparent 60%),var(--bg);}
+    .collab-wrap{display:grid;grid-template-columns:1fr 1fr;gap:20px;width:100%;margin-top:24px;}
+    .collab-col{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:28px 24px;text-align:left;}
+    .collab-col.left{border-color:rgba(139,92,246,.3);}
+    .collab-col.right{border-color:rgba(16,185,129,.3);}
+    .collab-title{font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:20px;}
+    .collab-col.left .collab-title{color:var(--purple);}
+    .collab-col.right .collab-title{color:var(--green);}
+    .collab-item{display:flex;align-items:flex-start;gap:12px;padding:9px 0;border-bottom:1px solid var(--border);}
+    .collab-item:last-child{border-bottom:none;}
+    .ci-bullet{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;
+               justify-content:center;font-size:12px;flex-shrink:0;margin-top:1px;}
+    .collab-col.left .ci-bullet{background:rgba(139,92,246,.15);color:var(--purple);}
+    .collab-col.right .ci-bullet{background:rgba(16,185,129,.15);color:var(--green);}
+    .ci-text{font-size:13px;color:var(--text);line-height:1.5;}
+    .ci-text small{display:block;font-size:11px;color:var(--muted);margin-top:2px;}
+    .collab-cta{margin-top:22px;background:linear-gradient(135deg,rgba(139,92,246,.15),rgba(16,185,129,.10));
+                border:1px solid rgba(139,92,246,.3);border-radius:14px;padding:18px 24px;
+                width:100%;text-align:center;}
+    .collab-cta p{font-size:15px;font-weight:600;color:var(--text);margin:0;}
+    .collab-cta small{font-size:12px;color:var(--muted);}
+
+    /* ── S12 PROPUESTA INVERSIÓN ── */
+    #s12{background:radial-gradient(ellipse at 50% 45%,rgba(59,130,246,.14) 0%,transparent 65%),var(--bg);}
+    .proposal-box{background:var(--surface);border:1px solid rgba(59,130,246,.3);border-radius:20px;
+                  padding:32px 42px;max-width:620px;width:100%;margin-top:24px;}
+    .pro-price{font-size:46px;font-weight:800;background:linear-gradient(135deg,var(--blue),var(--purple));
+               -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+    .pro-period{font-size:15px;color:var(--muted);margin-bottom:22px;}
+    .pro-points{text-align:left;display:flex;flex-direction:column;gap:10px;}
+    .pro-point{display:flex;align-items:center;gap:12px;font-size:14px;color:var(--text);}
+    .pp-icon{width:26px;height:26px;background:rgba(16,185,129,.15);border-radius:50%;
+             display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;color:var(--green);}
+  
+/* ===== Adaptación móvil automática ===== */
+@media (max-width: 768px) {
+  body { overflow-y: auto !important; height: auto !important; }
+  .deck { height: auto !important; }
+  .slide {
+    position: relative !important;
+    opacity: 1 !important;
+    transform: none !important;
+    pointer-events: all !important;
+    min-height: auto !important;
+    padding: 32px 20px !important;
+    margin-bottom: 24px;
+  }
+
+  .slide:not(.active) { display: flex !important; }
+
+  .problem-grid,
+  .advantage-cols,
+  .sys-map,
+  .v2-grid,
+  .compare-wrap,
+  .collab-wrap,
+  .ad-grid,
+  .ad-header {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+  }
+
+  .solution-pillars {
+    flex-direction: column !important;
+    align-items: center !important;
+  }
+
+  .pillar,
+  .proposal-box,
+  .dash-preview {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .nav,
+  .slide-counter {
+    display: none !important;
+  }
+
+  h1 { font-size: 2rem !important; }
+  h2 { font-size: 1.7rem !important; }
+
+  p, .problem-card span, .phase-info span {
+    font-size: 0.95rem !important;
+  }
+}
+
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+
+<!-- ▸ 01 PORTADA -->
+<div class="slide active" id="s1">
+  <div class="logo-ring">⚡</div>
+  <div class="badge">Ingeniería de Software — Proyecto Final UTN</div>
+  <h1>ATENAS<br><span class="accent">Sistema de Información</span></h1>
+  <p style="margin-top:12px;max-width:500px;font-size:16px;">De la venta en campo a la gestión total · Argentina &amp; Chile</p>
+  <div class="tags">
+    <span class="tag">🇦🇷 Argentina</span><span class="tag">🇨🇱 Chile</span>
+    <span class="tag">⚙️ PostgreSQL</span><span class="tag">🔗 API REST</span>
+    <span class="tag">🤖 Desarrollado con IA</span>
+  </div>
+</div>
+
+<!-- ▸ 02 PROBLEMAS -->
+<div class="slide" id="s2">
+  <div class="badge" style="color:var(--red);border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.08);">La situación hoy</div>
+  <h2>El negocio crece.<br>La gestión <span style="color:var(--red)">no acompaña.</span></h2>
+  <div class="problem-grid">
+    <div class="problem-card"><div class="problem-icon">📱</div><div><strong>WhatsApp como sistema de gestión</strong><span>Ventas, comisiones y validaciones por mensajes. Sin registro permanente ni control real.</span></div></div>
+    <div class="problem-card"><div class="problem-icon">🧮</div><div><strong>Comisiones calculadas a mano</strong><span>Cada semana, cálculo manual de bonos, umbrales del líder y retroactivos. Errores y disputas.</span></div></div>
+    <div class="problem-card"><div class="problem-icon">📄</div><div><strong>Sin validación formal de ventas</strong><span>Los comprobantes se revisan sin sistema, sin flujo estándar y sin trazabilidad.</span></div></div>
+    <div class="problem-card"><div class="problem-icon">📦</div><div><strong>Inventario de cupones sin control</strong><span>El stock físico se lleva mentalmente. Pérdidas y faltantes sin registro.</span></div></div>
+    <div class="problem-card"><div class="problem-icon">📊</div><div><strong>Sin reportes ni rankings</strong><span>No hay datos concretos. La gerencia toma decisiones basadas en memoria, no en información.</span></div></div>
+    <div class="problem-card"><div class="problem-icon">🌎</div><div><strong>Expansión sin herramientas</strong><span>Dos países, dos monedas, múltiples equipos. Escalar así es inviable.</span></div></div>
+  </div>
+</div>
+
+<!-- ▸ 03 SOLUCIÓN -->
+<div class="slide" id="s3">
+  <div class="badge" style="color:var(--green);border-color:rgba(16,185,129,.3);background:rgba(16,185,129,.08);">La solución</div>
+  <h2>Un sistema hecho<br>desde <span class="accent-green">adentro del negocio.</span></h2>
+  <div class="divider"></div>
+  <p style="max-width:560px;">ATENAS Software reemplaza WhatsApp y los procesos manuales por una plataforma web completa: ventas, validaciones, comisiones, inventario y reportes — todo integrado, disponible desde el celular o la computadora.</p>
+  <div class="solution-pillars">
+    <div class="pillar"><div class="p-icon">📱</div><div class="p-label">100% responsive<br>móvil + escritorio</div></div>
+    <div class="pillar"><div class="p-icon">🌎</div><div class="p-label">Argentina<br>&amp; Chile</div></div>
+    <div class="pillar"><div class="p-icon">⚡</div><div class="p-label">Tiempo real<br>sin WhatsApp</div></div>
+    <div class="pillar"><div class="p-icon">🔒</div><div class="p-label">Roles y permisos<br>diferenciados</div></div>
+    <div class="pillar"><div class="p-icon">📊</div><div class="p-label">Reportes<br>exportables</div></div>
+  </div>
+</div>
+
+<!-- ▸ 04 AVANCE -->
+<div class="slide" id="s4">
+  <div class="badge">Estado del proyecto</div>
+  <h2>Las fases más difíciles:<br><span class="accent-green">ya completadas.</span></h2>
+  <div class="phase-list">
+    <div class="phase-row done"><div class="phase-status">✓</div><div class="phase-info"><strong>Especificación Funcional</strong><span>7 módulos · 33 requisitos funcionales · 12 no funcionales · todas las reglas de negocio documentadas</span></div><span class="phase-badge">COMPLETA</span></div>
+    <div class="phase-row done"><div class="phase-status">✓</div><div class="phase-info"><strong>Modelo de Dominio</strong><span>24 entidades · 8 clusters temáticos · 36 relaciones con cardinalidades</span></div><span class="phase-badge">COMPLETA</span></div>
+    <div class="phase-row done"><div class="phase-status">✓</div><div class="phase-info"><strong>Diseño de Base de Datos</strong><span>25 tablas · 14 tipos de datos · ~50 índices de rendimiento · PostgreSQL 15+</span></div><span class="phase-badge">COMPLETA</span></div>
+    <div class="phase-row in-progress"><div class="phase-status">→</div><div class="phase-info"><strong>Diseño de API REST</strong><span>Estructura, autenticación JWT y dashboard definidos · endpoints por módulo en curso</span></div><span class="phase-badge">EN CURSO</span></div>
+    <div class="phase-row pending"><div class="phase-status">○</div><div class="phase-info"><strong>Implementación</strong><span>Backend + Frontend · despliegue y pruebas</span></div><span class="phase-badge">PRÓXIMA ETAPA</span></div>
+  </div>
+</div>
+
+<!-- ▸ 05 VENTAJA ÚNICA -->
+<div class="slide" id="s5">
+  <div class="badge" style="color:var(--purple);border-color:rgba(139,92,246,.3);background:rgba(139,92,246,.08);">Por qué avanzamos tan rápido</div>
+  <h2>Una combinación<br><span class="accent-purple">única e irrepetible.</span></h2>
+  <div class="advantage-cols">
+    <div class="adv-card"><div class="adv-icon">🧑‍💼</div><h3>El desarrollador es parte del negocio</h3><p>Trabajo como vendedor en ATENAS. Conozco de primera mano cada flujo real: cómo funciona una venta, cómo se calculan las comisiones, qué dolores tiene el secretario cada semana. El relevamiento es 100% real.</p></div>
+    <div class="adv-card adv-highlight"><div class="adv-icon">🤖</div><h3>IA como consultor técnico senior</h3><p>Claude actúa como arquitecto de software: hace las preguntas correctas, identifica inconsistencias, propone opciones con sus ventajas y desventajas. Lo que tomaría meses de consultoría se resuelve en sesiones de trabajo.</p></div>
+    <div class="adv-card"><div class="adv-icon">🎓</div><h3>Formación en Ingeniería de Sistemas</h3><p>El conocimiento técnico traduce los procesos del negocio en arquitectura de software correcta. Sin ese puente, el relevamiento no puede convertirse en un sistema real.</p></div>
+    <div class="adv-card adv-highlight"><div class="adv-icon">⚡</div><h3>Análisis profesional en tiempo récord</h3><p>La combinación de conocimiento interno + IA + formación técnica produjo en semanas lo que normalmente toma meses a un equipo de consultores externos que primero tiene que aprender el negocio.</p></div>
+  </div>
+</div>
+
+<!-- ▸ 06 MAPA DEL SISTEMA (NUEVO) -->
+<div class="slide" id="s6">
+  <div class="badge">Alcance del sistema</div>
+  <h2>25 tablas. 8 módulos.<br><span class="accent">1 sistema integrado.</span></h2>
+  <div class="sys-map">
+    <div class="sys-module col-ops"><div class="sm-header"><span class="sm-icon">📱</span><span class="sm-name">Ventas</span><div class="sm-dot"></div></div><div class="sm-entities"><span class="sm-entity highlight">Registro de venta</span><span class="sm-entity highlight">Foto comprobante</span><span class="sm-entity">Estados (pendiente/validada)</span><span class="sm-entity">Traspaso de clínica</span></div></div>
+    <div class="sys-module col-ops"><div class="sm-header"><span class="sm-icon">✅</span><span class="sm-name">Validación</span><div class="sm-dot"></div></div><div class="sm-entities"><span class="sm-entity highlight">Cola del secretario</span><span class="sm-entity highlight">Datos del cliente</span><span class="sm-entity">Exportación a clínicas</span><span class="sm-entity">Historial de validaciones</span></div></div>
+    <div class="sys-module col-fin"><div class="sm-header"><span class="sm-icon">💰</span><span class="sm-name">Comisiones</span><div class="sm-dot"></div></div><div class="sm-entities"><span class="sm-entity highlight">Tabla de comisiones</span><span class="sm-entity highlight">Umbral del líder</span><span class="sm-entity">Retroactivo semanal</span><span class="sm-entity">Bono fin de semana</span></div></div>
+    <div class="sys-module col-fin"><div class="sm-header"><span class="sm-icon">💳</span><span class="sm-name">Pagos</span><div class="sm-dot"></div></div><div class="sm-entities"><span class="sm-entity highlight">Pagos semanales</span><span class="sm-entity highlight">Rendición efectivo</span><span class="sm-entity">Resumen por vendedor</span><span class="sm-entity">Registro del tesorero</span></div></div>
+    <div class="sys-module col-eng"><div class="sm-header"><span class="sm-icon">📊</span><span class="sm-name">Dashboard</span><div class="sm-dot"></div></div><div class="sm-entities"><span class="sm-entity highlight">Ranking en tiempo real</span><span class="sm-entity highlight">Emoji personal</span><span class="sm-entity">Meta diaria</span><span class="sm-entity">Récord histórico 🎁</span></div></div>
+    <div class="sys-module col-ops"><div class="sm-header"><span class="sm-icon">🎫</span><span class="sm-name">Campañas</span><div class="sm-dot"></div></div><div class="sm-entities"><span class="sm-entity highlight">Clínicas</span><span class="sm-entity highlight">Cupón activo por clínica</span><span class="sm-entity">Estados (borrador/activo)</span><span class="sm-entity">Precio y descuento</span></div></div>
+    <div class="sys-module col-adm"><div class="sm-header"><span class="sm-icon">📦</span><span class="sm-name">Inventario</span><div class="sm-dot"></div></div><div class="sm-entities"><span class="sm-entity highlight">Lotes de cupones</span><span class="sm-entity">Stock por equipo</span><span class="sm-entity">Stock por vendedor</span><span class="sm-entity">Pérdidas y daños</span></div></div>
+    <div class="sys-module col-adm"><div class="sm-header"><span class="sm-icon">📋</span><span class="sm-name">Reportes</span><div class="sm-dot"></div></div><div class="sm-entities"><span class="sm-entity highlight">Rankings diarios/semanales</span><span class="sm-entity highlight">Exportación Excel</span><span class="sm-entity">Filtros por ciudad/país</span><span class="sm-entity">Evolución por vendedor</span></div></div>
+  </div>
+  <div class="map-legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div>Operaciones</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>Finanzas</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--amber)"></div>Engagement</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--purple)"></div>Administración</div>
+    <div class="legend-item" style="margin-left:8px;"><span style="color:var(--text);font-size:11px;font-weight:600;">Negrita = clave en V1</span></div>
+  </div>
+</div>
+
+<!-- ▸ 07 ANTES / DESPUÉS (REDISEÑADO) -->
+<div class="slide" id="s7">
+  <div class="badge">MVP — Lo que cambia en el día a día</div>
+  <h2>Situaciones reales.<br><span class="accent-green">Soluciones concretas.</span></h2>
+  <div class="ad-grid">
+    <div class="ad-col-title b">❌ Hoy sin sistema</div>
+    <div class="ad-col-title a">✅ Con ATENAS</div>
+
+    <div class="ad-cell before"><span class="ad-label">REGISTRO DE VENTA</span><p>El vendedor manda foto al WhatsApp del líder. El secretario la busca entre los mensajes para validarla. Sin orden, sin trazabilidad.</p></div>
+    <div class="ad-cell after"><span class="ad-label">REGISTRO DE VENTA</span><p>El vendedor registra desde su celular: selecciona clínica, forma de pago, sube la foto. La venta aparece al instante en la cola del secretario.</p></div>
+
+    <div class="ad-cell before"><span class="ad-label">COMISIONES</span><p>El tesorero calcula cada semana a mano: bonos, umbrales del líder, retroactivos. Errores frecuentes. Discusiones recurrentes.</p></div>
+    <div class="ad-cell after"><span class="ad-label">COMISIONES</span><p>El sistema calcula automáticamente al registrar cada venta. El retroactivo del líder se recalcula solo al cruzar un umbral. Sin errores, sin disputas.</p></div>
+
+    <div class="ad-cell before"><span class="ad-label">INVENTARIO DE CUPONES</span><p>Nadie sabe exactamente cuántos cupones tiene cada vendedor. Las pérdidas no se registran. El líder lleva la cuenta mentalmente.</p></div>
+    <div class="ad-cell after"><span class="ad-label">INVENTARIO DE CUPONES</span><p>Stock en tiempo real por equipo y por vendedor. Pérdidas y daños registrados con motivo. El líder asigna cupones desde la app.</p></div>
+
+    <div class="ad-cell before"><span class="ad-label">REPORTES Y RANKINGS</span><p>Los rankings se arman manualmente para el grupo de WhatsApp. No hay historial, no hay estadísticas reales por período.</p></div>
+    <div class="ad-cell after"><span class="ad-label">REPORTES Y RANKINGS</span><p>Rankings automáticos diarios y semanales. Filtros por vendedor, ciudad, país y período. Exportación a Excel en un clic.</p></div>
+  </div>
+</div>
+
+<!-- ▸ 08 DASHBOARD -->
+<div class="slide" id="s8">
+  <div class="badge">La novedad del MVP</div>
+  <h2>Dashboard en vivo:<br><span class="accent">la competencia como motor.</span></h2>
+  <div class="dash-preview">
+    <div class="dash-team-header">🔥 Equipo Norte · Hoy</div>
+    <div class="dash-vendor"><div class="dv-name">Lucas P.</div><div class="dv-meta">Meta: 10</div><div class="dv-emojis">🦁🦁🦁🦁🦁🎁🦁🦁🦁🦁🎁</div><div class="dv-record">Récord: 11 🏆</div></div>
+    <div class="dash-vendor"><div class="dv-name">Sofía M.</div><div class="dv-meta">Meta: 8</div><div class="dv-emojis">🐯🐯🐯🐯🐯🎁🐯🐯</div><div class="dv-record">Récord: 10</div></div>
+    <div class="dash-vendor"><div class="dv-name">Matías R.</div><div class="dv-meta">Meta: 10</div><div class="dv-emojis">⚡⚡⚡⚡⚡🎁⚡</div><div class="dv-record">Récord: 9</div></div>
+  </div>
+  <p style="margin-top:16px;max-width:580px;font-size:13px;">Cada vendedor elige su emoji. Las ventas se acumulan en tiempo real. El 🎁 aparece al superar el récord personal o por cada 5 ventas en fin de semana. Transparencia total para todo el equipo.</p>
+</div>
+
+<!-- ▸ 09 V2 -->
+<div class="slide" id="s9">
+  <div class="badge" style="color:var(--amber);border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.08);">Versión 2 — Lo que viene</div>
+  <h2>El MVP es el cimiento.<br><span class="accent-amber">V2 es donde se pone bueno.</span></h2>
+  <div class="v2-grid">
+    <div class="v2-card"><div class="v2-icon">🎮</div><h3>Juegos diarios</h3><p style="font-size:12px;">Fotos con clientes, robos entre vendedores y pozo del día. La estructura ya está diseñada en la base de datos.</p><span class="v2-coming">V2</span></div>
+    <div class="v2-card"><div class="v2-icon">⚡</div><h3>Tiempo real con efectos</h3><p style="font-size:12px;">El dashboard se actualiza al instante con animaciones. Cada venta aparece en pantalla sin recargar.</p><span class="v2-coming">V2</span></div>
+    <div class="v2-card"><div class="v2-icon">📈</div><h3>Estadísticas avanzadas</h3><p style="font-size:12px;">Evolución mensual, semanas históricas, dashboards gráficos y comparativas entre equipos.</p><span class="v2-coming">V2</span></div>
+    <div class="v2-card"><div class="v2-icon">📲</div><h3>App nativa móvil</h3><p style="font-size:12px;">iOS y Android. El sistema ya está diseñado para soportarlo sin reescribir nada del backend.</p><span class="v2-coming">V3</span></div>
+    <div class="v2-card"><div class="v2-icon">🔔</div><h3>Notificaciones automáticas</h3><p style="font-size:12px;">Email y push al secretario y líderes ante ventas fuera de campaña y eventos importantes.</p><span class="v2-coming">V2</span></div>
+    <div class="v2-card"><div class="v2-icon">🏥</div><h3>Portal para clínicas</h3><p style="font-size:12px;">Las clínicas verán sus clientes y validaciones sin depender de exportaciones manuales.</p><span class="v2-coming">V3</span></div>
+  </div>
+</div>
+
+<!-- ▸ 10 COMPARACIÓN TIEMPO -->
+<div class="slide" id="s10">
+  <div class="badge">El impacto real de la IA</div>
+  <h2>La misma calidad.<br><span class="accent">Una fracción del tiempo.</span></h2>
+  <div class="compare-wrap">
+    <div class="cmp-col slow">
+      <div class="cmp-title">Sin IA — Método tradicional</div>
+      <div class="cmp-item"><span class="ci-label">Especificación funcional</span><span class="ci-val">4–6 sem.</span></div>
+      <div class="cmp-item"><span class="ci-label">Modelo de dominio</span><span class="ci-val">3–5 sem.</span></div>
+      <div class="cmp-item"><span class="ci-label">Diseño de base de datos</span><span class="ci-val">2–4 sem.</span></div>
+      <div class="cmp-item"><span class="ci-label">Diseño de API</span><span class="ci-val">3–5 sem.</span></div>
+      <div class="cmp-item" style="border-top:1px solid var(--border);margin-top:6px;padding-top:10px;"><span class="ci-label" style="font-weight:700;color:var(--text);">Total análisis y diseño</span><span class="ci-val" style="font-size:17px;">4–5 meses</span></div>
+    </div>
+    <div class="vs-badge">VS</div>
+    <div class="cmp-col fast highlight">
+      <div class="cmp-title">Con Claude Pro</div>
+      <div class="cmp-item"><span class="ci-label">Especificación funcional</span><span class="ci-val">1 semana</span></div>
+      <div class="cmp-item"><span class="ci-label">Modelo de dominio</span><span class="ci-val">3–4 días</span></div>
+      <div class="cmp-item"><span class="ci-label">Diseño de base de datos</span><span class="ci-val">2–3 días</span></div>
+      <div class="cmp-item"><span class="ci-label">Diseño de API</span><span class="ci-val">1 semana</span></div>
+      <div class="cmp-item" style="border-top:1px solid var(--border);margin-top:6px;padding-top:10px;"><span class="ci-label" style="font-weight:700;color:var(--text);">Total análisis y diseño</span><span class="ci-val" style="font-size:17px;">3–4 semanas</span></div>
+    </div>
+  </div>
+  <p style="margin-top:18px;font-size:13px;">La IA no reemplaza el conocimiento ni la formación técnica — los <em>multiplica</em>. Cada decisión sigue siendo tomada por la persona.</p>
+</div>
+
+<!-- ▸ 11 PROPUESTA DE COLABORACIÓN (NUEVO) -->
+<div class="slide" id="s11">
+  <div class="badge" style="color:var(--purple);border-color:rgba(139,92,246,.3);background:rgba(139,92,246,.08);">La propuesta</div>
+  <h2>Una oportunidad que<br><span class="accent-purple">difícilmente se repite.</span></h2>
+  <div class="collab-wrap">
+    <div class="collab-col left">
+      <div class="collab-title">Lo que traigo yo</div>
+      <div class="collab-item"><div class="ci-bullet">✓</div><div class="ci-text">Conozco el negocio desde adentro<small>Soy vendedor de ATENAS. Cada requisito del sistema es real, no supuesto.</small></div></div>
+      <div class="collab-item"><div class="ci-bullet">✓</div><div class="ci-text">Formación técnica en Ingeniería de Sistemas<small>El análisis, la arquitectura y el diseño tienen respaldo académico y profesional.</small></div></div>
+      <div class="collab-item"><div class="ci-bullet">✓</div><div class="ci-text">El trabajo más difícil ya está hecho<small>Especificación, base de datos y arquitectura completos. Sin costo de entrada.</small></div></div>
+      <div class="collab-item"><div class="ci-bullet">✓</div><div class="ci-text">Sin honorarios de desarrollo<small>El proyecto tiene fines académicos. El valor que entrego es real; el costo, mínimo.</small></div></div>
+    </div>
+    <div class="collab-col right">
+      <div class="collab-title">Lo que necesito de ustedes</div>
+      <div class="collab-item"><div class="ci-bullet">→</div><div class="ci-text">Colaboración en las decisiones<small>Validar el sistema en cada fase para que sea 100% aplicable al negocio real.</small></div></div>
+      <div class="collab-item"><div class="ci-bullet">→</div><div class="ci-text">Acceso a información cuando haga falta<small>Datos, flujos y procesos que solo ustedes conocen.</small></div></div>
+      <div class="collab-item"><div class="ci-bullet">→</div><div class="ci-text">Confianza en el proceso<small>Un sistema bien diseñado no se construye de un día para otro — pero se construye bien.</small></div></div>
+      <div class="collab-item"><div class="ci-bullet">→</div><div class="ci-text">Claude Pro: ~$20 USD/mes<small>La herramienta que hace posible este ritmo de avance. Una membresía, un sistema a medida.</small></div></div>
+    </div>
+  </div>
+  <div class="collab-cta">
+    <p>Un sistema hecho a medida para ATENAS — no un software genérico adaptado.</p>
+    <small>Diseñado con conocimiento interno del negocio · Construido con estándares de la industria · Preparado para crecer</small>
+  </div>
+</div>
+
+<!-- ▸ 12 LA INVERSIÓN -->
+<div class="slide" id="s12">
+  <div class="badge">La inversión</div>
+  <h2>Lo que hace posible<br><span class="accent">todo lo que vieron.</span></h2>
+  <div class="proposal-box">
+    <div class="pro-price">~$20 USD</div>
+    <div class="pro-period">/ mes · Claude Pro — la herramienta que acelera el desarrollo</div>
+    <div class="pro-points">
+      <div class="pro-point"><div class="pp-icon">✓</div>Reemplaza semanas de consultoría técnica externa</div>
+      <div class="pro-point"><div class="pp-icon">✓</div>Garantiza decisiones de diseño de calidad profesional</div>
+      <div class="pro-point"><div class="pp-icon">✓</div>Genera documentación técnica completa y actualizada</div>
+      <div class="pro-point"><div class="pp-icon">✓</div>Acorta el análisis de meses a semanas — ya demostrado</div>
+      <div class="pro-point"><div class="pp-icon">✓</div>Acelera también la implementación que viene</div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /deck -->
+
+<div class="slide-counter" id="counter">1 / 12</div>
+<div class="nav">
+  <button class="nav-btn" onclick="navigate(-1)">←</button>
+  <div class="dots" id="dots"></div>
+  <button class="nav-btn" onclick="navigate(1)">→</button>
+</div>
+
+<script>
+  const slides=document.querySelectorAll('.slide');
+  const dotsEl=document.getElementById('dots');
+  const counter=document.getElementById('counter');
+  let cur=0;
+  slides.forEach((_,i)=>{
+    const d=document.createElement('div');
+    d.className='dot'+(i===0?' active':'');
+    d.onclick=()=>goTo(i);
+    dotsEl.appendChild(d);
+  });
+  function goTo(idx){
+    if(idx<0||idx>=slides.length)return;
+    slides[cur].classList.remove('active');
+    slides[cur].classList.add('exit');
+    const prev=cur; cur=idx;
+    setTimeout(()=>slides[prev].classList.remove('exit'),420);
+    slides[cur].classList.add('active');
+    document.querySelectorAll('.dot').forEach((d,i)=>d.classList.toggle('active',i===cur));
+    counter.textContent=`${cur+1} / ${slides.length}`;
+  }
+  function navigate(dir){goTo(cur+dir);}
+  document.addEventListener('keydown',e=>{
+    if(e.key==='ArrowRight'||e.key==='ArrowDown')navigate(1);
+    if(e.key==='ArrowLeft'||e.key==='ArrowUp')navigate(-1);
+  });
+</script>
+</body>
+</html>
