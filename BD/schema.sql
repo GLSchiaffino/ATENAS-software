@@ -1,6 +1,6 @@
 -- ================================================================
 -- ATENAS — Sistema de Información
--- Esquema de Base de Datos v1.1  |  PostgreSQL 15+
+-- Esquema de Base de Datos v1.2  |  PostgreSQL 15+
 -- Proyecto Final UTN — Ingeniería de Software
 -- ================================================================
 --
@@ -23,6 +23,12 @@
 --                             record_ventas_dia
 --   · NUEVO CLUSTER 4.5     → tabla jornada_diaria
 --   · Índices               → nuevos índices para dashboard
+--
+-- Cambios v1.2 (Portal Clínicas — adelantado de V3):
+--   · ENUM usuario_rol      → nuevo valor CLINICA
+--   · ENUM equipo_categoria → nuevo valor CLINICAS
+--   · usuario               → campo clinica_id (FK a clinica, nullable)
+--                             + constraint: CLINICA role requiere clinica_id
 -- ================================================================
 
 -- ----------------------------------------------------------------
@@ -33,14 +39,16 @@ CREATE TYPE moneda_tipo          AS ENUM ('CLP', 'ARS');
 
 CREATE TYPE usuario_rol          AS ENUM (
     'VENDEDOR', 'LIDER', 'SECRETARIO',
-    'TESORERO', 'ENCARGADO_JUEGOS', 'GERENCIA'
+    'TESORERO', 'ENCARGADO_JUEGOS', 'GERENCIA',
+    'CLINICA'   -- v1.2: acceso de solo lectura al portal de su clínica
 );
 
 CREATE TYPE equipo_categoria     AS ENUM (
     'CAMPO',            -- equipos de vendedores en campo
     'ADMINISTRACION',   -- secretarios y encargado de juegos
     'FINANZAS',         -- tesoreros
-    'GERENCIA'          -- gerencia
+    'GERENCIA',         -- gerencia
+    'CLINICAS'          -- v1.2: usuarios del portal de clínicas
 );
 
 CREATE TYPE cupon_estado         AS ENUM ('BORRADOR', 'ACTIVO', 'INACTIVO');
@@ -151,16 +159,23 @@ CREATE TABLE usuario (
     password_hash  VARCHAR(255) NOT NULL,
     rol            usuario_rol  NOT NULL,
     equipo_id      UUID         NOT NULL REFERENCES equipo(id),
+    -- v1.2: portal clínicas — qué clínica puede ver este usuario.
+    -- NULL para todos los roles excepto CLINICA.
+    -- La FK a clinica se declara después del CREATE TABLE clinica (ver Cluster 3).
+    clinica_id     UUID,
     -- v1.1: campos de dashboard — solo relevantes para vendedores de campo.
     -- NULL válido para usuarios de oficina (secretario, tesorero, etc.)
-    emoji_personal      VARCHAR(10)  UNIQUE,          -- elegido por el vendedor, único en todo ATENAS
+    emoji_personal      VARCHAR(10)  UNIQUE,
     meta_ventas_default INTEGER      DEFAULT 10
                         CHECK (meta_ventas_default > 0),
     record_ventas_dia   INTEGER      NOT NULL DEFAULT 0
-                        CHECK (record_ventas_dia >= 0), -- máximo de ventas en un día (editable para datos históricos previos al sistema)
+                        CHECK (record_ventas_dia >= 0),
     activo         BOOLEAN      NOT NULL DEFAULT TRUE,
     fecha_creacion TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    ultimo_acceso  TIMESTAMPTZ
+    ultimo_acceso  TIMESTAMPTZ,
+    -- Un usuario CLINICA debe tener clinica_id; los demás roles no lo usan
+    CONSTRAINT ck_usuario_clinica_rol
+        CHECK ((rol != 'CLINICA') OR (clinica_id IS NOT NULL))
 );
 
 -- FK diferida: permite insertar equipo + usuario en la misma transacción
@@ -183,6 +198,12 @@ CREATE TABLE clinica (
     contacto_telefono VARCHAR(30),
     activo            BOOLEAN      NOT NULL DEFAULT TRUE
 );
+
+-- v1.2: FK de usuario.clinica_id → clinica.
+-- Se declara aquí porque clinica se crea después de usuario.
+ALTER TABLE usuario
+    ADD CONSTRAINT fk_usuario_clinica
+    FOREIGN KEY (clinica_id) REFERENCES clinica(id);
 
 CREATE TABLE cupon (
     id                   UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
