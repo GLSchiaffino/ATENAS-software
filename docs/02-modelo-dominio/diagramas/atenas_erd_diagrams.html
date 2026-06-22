@@ -1,0 +1,333 @@
+
+<style>
+h2.sr-only { position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0 }
+.section-label { font-size:11px;font-weight:500;letter-spacing:0.07em;text-transform:uppercase;color:var(--color-text-tertiary);margin:0 0 8px }
+.diagram-wrap { overflow-x:auto;min-height:80px }
+.divider { border:none;border-top:0.5px solid var(--color-border-tertiary);margin:24px 0 }
+.err-msg { font-size:12px;color:var(--color-text-danger);padding:8px 0 }
+</style>
+
+<h2 class="sr-only">Modelo de dominio ATENAS — Diagramas entidad-relación: núcleo transaccional y módulo financiero-operacional</h2>
+
+<p class="section-label">Diagrama 1 — Núcleo transaccional</p>
+<div class="diagram-wrap" id="erd1"><span style="font-size:12px;color:var(--color-text-tertiary)">Cargando…</span></div>
+
+<hr class="divider">
+
+<p class="section-label">Diagrama 2 — Financiero, inventario y sistema (incl. V2 juegos)</p>
+<div class="diagram-wrap" id="erd2"><span style="font-size:12px;color:var(--color-text-tertiary)">Cargando…</span></div>
+
+<script type="module">
+import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
+
+const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+await document.fonts.ready;
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'base',
+  fontFamily: '"Anthropic Sans", sans-serif',
+  themeVariables: {
+    darkMode: dark,
+    fontSize: '13px',
+    fontFamily: '"Anthropic Sans", sans-serif',
+    lineColor: dark ? '#9c9a92' : '#73726c',
+    textColor: dark ? '#c2c0b6' : '#3d3d3a',
+    primaryColor: dark ? '#2a2a28' : '#f1efe8',
+    primaryBorderColor: dark ? '#5f5e5a' : '#b4b2a9',
+    primaryTextColor: dark ? '#c2c0b6' : '#3d3d3a',
+  },
+});
+
+const erd1def = `erDiagram
+  PAIS {
+    uuid id PK
+    string codigo_iso
+    enum moneda
+    boolean activo
+  }
+  CIUDAD {
+    uuid id PK
+    uuid pais_id FK
+    string nombre
+    boolean activo
+  }
+  PUNTO_DE_VENTA {
+    uuid id PK
+    uuid ciudad_id FK
+    uuid equipo_id FK
+    string nombre
+    boolean activo
+  }
+  EQUIPO {
+    uuid id PK
+    uuid lider_id FK
+    string nombre
+    boolean activo
+  }
+  USUARIO {
+    uuid id PK
+    string username
+    string email
+    enum rol
+    uuid equipo_id FK
+    boolean activo
+  }
+  CLINICA {
+    uuid id PK
+    string nombre
+    string tipo
+    boolean activo
+  }
+  CUPON {
+    uuid id PK
+    uuid clinica_id FK
+    decimal precio
+    decimal precio_con_descuento
+    enum estado
+    datetime fecha_activacion
+    datetime fecha_desactivacion
+  }
+  CLIENTE {
+    uuid id PK
+    string dni
+    string nombre
+    string apellido
+    string telefono
+  }
+  SEMANA_LABORAL {
+    uuid id PK
+    date fecha_inicio
+    date fecha_fin
+    enum estado
+  }
+  VENTA {
+    uuid id PK
+    uuid vendedor_id FK
+    uuid cupon_id FK
+    uuid cliente_id FK
+    uuid semana_laboral_id FK
+    uuid punto_de_venta_id FK
+    enum forma_pago
+    string numero_autorizacion
+    enum origen_autorizacion
+    boolean aplico_descuento
+    decimal precio_final
+    enum moneda
+    enum estado
+    boolean fuera_de_campana
+    datetime fecha_hora_registro
+  }
+  IMAGEN_VENTA {
+    uuid id PK
+    uuid venta_id FK
+    string url_almacenamiento
+    int tamanio_bytes
+    datetime fecha_subida
+  }
+  TRASPASO_VENTA {
+    uuid id PK
+    uuid venta_id FK
+    uuid cupon_origen_id FK
+    uuid cupon_destino_id FK
+    uuid registrado_por_id FK
+    text motivo
+    datetime fecha_traspaso
+  }
+
+  PAIS ||--o{ CIUDAD : "contiene"
+  CIUDAD ||--o{ PUNTO_DE_VENTA : "contiene"
+  EQUIPO ||--|{ PUNTO_DE_VENTA : "opera en"
+  EQUIPO ||--|{ USUARIO : "tiene miembros"
+  EQUIPO ||--|| USUARIO : "liderado por"
+  CLINICA ||--o{ CUPON : "tiene"
+  USUARIO ||--o{ VENTA : "registra"
+  CUPON ||--o{ VENTA : "usado en"
+  PUNTO_DE_VENTA ||--o{ VENTA : "lugar de"
+  SEMANA_LABORAL ||--o{ VENTA : "agrupa"
+  CLIENTE |o--o{ VENTA : "asociado a"
+  VENTA ||--|{ IMAGEN_VENTA : "tiene"
+  VENTA ||--o| TRASPASO_VENTA : "puede tener"
+  CUPON ||--o{ TRASPASO_VENTA : "es origen"
+  CUPON ||--o{ TRASPASO_VENTA : "es destino"
+`;
+
+const erd2def = `erDiagram
+  VENTA {
+    uuid id PK
+  }
+  USUARIO {
+    uuid id PK
+    enum rol
+  }
+  SEMANA_LABORAL {
+    uuid id PK
+    date fecha_inicio
+    enum estado
+  }
+  CUPON {
+    uuid id PK
+  }
+  EQUIPO {
+    uuid id PK
+  }
+  TABLA_COMISION {
+    uuid id PK
+    decimal precio_venta
+    decimal monto_comision
+    boolean activo
+  }
+  UMBRAL_LIDER {
+    uuid id PK
+    int ventas_desde
+    int ventas_hasta
+    decimal monto_comision_lider
+    boolean activo
+  }
+  REGISTRO_COMISION {
+    uuid id PK
+    uuid venta_id FK
+    uuid beneficiario_id FK
+    uuid semana_laboral_id FK
+    enum tipo
+    decimal monto
+    enum moneda
+    boolean recalculado
+    datetime fecha_calculo
+  }
+  PAGO_VENDEDOR {
+    uuid id PK
+    uuid vendedor_id FK
+    uuid semana_laboral_id FK
+    uuid tesorero_id FK
+    decimal total
+    enum moneda
+    date fecha_pago
+  }
+  RENDICION_EFECTIVO {
+    uuid id PK
+    uuid vendedor_id FK
+    uuid lider_id FK
+    uuid semana_laboral_id FK
+    decimal monto
+    enum moneda
+    datetime fecha_rendicion
+  }
+  LOTE_INGRESO_CUPONES {
+    uuid id PK
+    uuid cupon_id FK
+    int cantidad
+    uuid registrado_por_id FK
+    datetime fecha_ingreso
+  }
+  MOVIMIENTO_CUPON {
+    uuid id PK
+    uuid lote_id FK
+    uuid equipo_id FK
+    uuid vendedor_id FK
+    enum tipo
+    int cantidad
+    datetime fecha
+  }
+  NOTIFICACION_INTERNA {
+    uuid id PK
+    uuid destinatario_id FK
+    uuid venta_id FK
+    enum tipo
+    string titulo
+    boolean leida
+    datetime fecha_creacion
+  }
+  LOG_AUDITORIA {
+    uuid id PK
+    uuid usuario_id FK
+    enum operacion
+    string entidad_tipo
+    uuid entidad_id
+    json datos_anteriores
+    json datos_nuevos
+    datetime fecha_hora
+  }
+  JUEGO {
+    uuid id PK
+    uuid encargado_id FK
+    uuid ganador_id FK
+    enum tipo
+    date fecha
+    enum estado
+  }
+  REGISTRO_JUEGO {
+    uuid id PK
+    uuid juego_id FK
+    uuid vendedor_id FK
+    int puntos
+    string url_foto
+    uuid robo_de_id FK
+  }
+  PREMIO_JUEGO {
+    uuid id PK
+    uuid juego_id FK
+    uuid vendedor_id FK
+    decimal monto
+    enum moneda
+    date fecha
+  }
+
+  VENTA ||--o{ REGISTRO_COMISION : "genera"
+  USUARIO ||--o{ REGISTRO_COMISION : "recibe"
+  SEMANA_LABORAL ||--o{ REGISTRO_COMISION : "agrupa"
+  USUARIO ||--o{ PAGO_VENDEDOR : "recibe"
+  SEMANA_LABORAL ||--o{ PAGO_VENDEDOR : "cubre"
+  USUARIO ||--o{ RENDICION_EFECTIVO : "rinde"
+  SEMANA_LABORAL ||--o{ RENDICION_EFECTIVO : "cubre"
+  CUPON ||--o{ LOTE_INGRESO_CUPONES : "recibe lotes"
+  LOTE_INGRESO_CUPONES ||--o{ MOVIMIENTO_CUPON : "origina"
+  EQUIPO ||--o{ MOVIMIENTO_CUPON : "destino asig."
+  USUARIO ||--o{ NOTIFICACION_INTERNA : "recibe"
+  VENTA |o--o{ NOTIFICACION_INTERNA : "contexto"
+  USUARIO ||--o{ LOG_AUDITORIA : "genera"
+  USUARIO ||--o{ JUEGO : "gestiona"
+  JUEGO ||--o{ REGISTRO_JUEGO : "tiene"
+  USUARIO ||--o{ REGISTRO_JUEGO : "participa"
+  JUEGO ||--o| PREMIO_JUEGO : "otorga"
+  USUARIO ||--o{ PREMIO_JUEGO : "gana"
+`;
+
+function postProcess(containerId) {
+  const container = document.getElementById(containerId);
+  container.querySelectorAll('svg.erDiagram .node').forEach(node => {
+    const firstPath = node.querySelector('path[d]');
+    if (!firstPath) return;
+    const d = firstPath.getAttribute('d');
+    const nums = d.match(/-?[\d.]+/g)?.map(Number);
+    if (!nums || nums.length < 8) return;
+    const xs = [nums[0], nums[2], nums[4], nums[6]];
+    const ys = [nums[1], nums[3], nums[5], nums[7]];
+    const x = Math.min(...xs), y = Math.min(...ys);
+    const w = Math.max(...xs) - x, h = Math.max(...ys) - y;
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('x', x); rect.setAttribute('y', y);
+    rect.setAttribute('width', w); rect.setAttribute('height', h);
+    rect.setAttribute('rx', '8');
+    for (const a of ['fill', 'stroke', 'stroke-width', 'class', 'style']) {
+      if (firstPath.hasAttribute(a)) rect.setAttribute(a, firstPath.getAttribute(a));
+    }
+    firstPath.replaceWith(rect);
+  });
+  container.querySelectorAll('svg.erDiagram .row-rect-odd path, svg.erDiagram .row-rect-even path').forEach(p => {
+    p.setAttribute('stroke', 'none');
+  });
+}
+
+async function renderErd(id, def) {
+  try {
+    const { svg } = await mermaid.render(id + '-svg', def);
+    document.getElementById(id).innerHTML = svg;
+    postProcess(id);
+  } catch(e) {
+    document.getElementById(id).innerHTML = `<span class="err-msg">Error al renderizar: ${e.message}</span>`;
+  }
+}
+
+await renderErd('erd1', erd1def);
+await renderErd('erd2', erd2def);
+</script>

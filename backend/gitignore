@@ -1,0 +1,39 @@
+# ============================================
+# ATENAS Backend — .gitignore
+# Spring Boot + Gradle + IntelliJ IDEA
+# ============================================
+
+# ---- Build de Gradle (código compilado, se regenera) ----
+build/
+!gradle/wrapper/gradle-wrapper.jar
+.gradle/
+
+# ---- IntelliJ IDEA ----
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# ---- Eclipse / VS Code (por si alguien clona con otro IDE) ----
+.classpath
+.project
+.settings/
+.vscode/
+bin/
+
+# ---- Logs ----
+*.log
+
+# ---- Sistema operativo ----
+.DS_Store
+Thumbs.db
+
+# ---- Variables de entorno y secretos ----
+# NUNCA subir credenciales reales al repo
+.env
+application-local.properties
+application-local.yml
+application-secret.properties
+*.pem
+*.key
