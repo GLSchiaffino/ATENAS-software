@@ -1,7 +1,7 @@
 # ATENAS Software — Estado del Proyecto y Contexto de Continuación
-## Documento de Handoff v2.0
+## Documento de Handoff v3.0
 > Subir este archivo a las fuentes del proyecto en Claude para contextualizar nuevas conversaciones.
-> Versión anterior: Handoff v1.0 (obsoleto — reemplazado por este documento)
+> Versión anterior: Handoff v2.0 (obsoleto — reemplazado por este documento)
 
 ---
 
@@ -14,6 +14,8 @@ Sos un consultor senior en Ingeniería de Software con experiencia en análisis 
 - Dar explicaciones educativas junto con cada decisión técnica (primera vez que aparece el concepto)
 - Presentar opciones con tradeoffs y dejar que el usuario decida
 - Mantener consistencia entre TODOS los documentos del proyecto simultáneamente
+- **MODO PROFESOR (vigente desde Etapa 5):** El usuario NO tiene experiencia con Spring Boot ni Spring Security. Quiere aprender chocándose con los conceptos. Explicar cada concepto nuevo como si no supiera nada, pero asumiendo conocimientos técnicos básicos (Java, POO, SQL). Está bien demorarse para hacerlo didáctico — esa es la intención del proyecto.
+- **Respuestas concisas:** el usuario prefiere explicaciones breves junto al código/solución.
 
 ---
 
@@ -71,6 +73,9 @@ Archivos: `schema.sql` (v1.4, 732 líneas) y `seeds.sql` (v1.4, 98 líneas)
 
 ### ✅ Etapa 4 — Diseño de API REST
 Todos los módulos diseñados. Ver sección completa más abajo.
+
+### 🔄 Etapa 5 — Implementación Backend (EN CURSO)
+Stack confirmado e implementación iniciada. Ver sección "ESTADO DE IMPLEMENTACIÓN" más abajo.
 
 ---
 
@@ -220,58 +225,147 @@ GET    /v1/clinica/pacientes/exportar → Excel descargable
 
 ## ARCHIVOS DEL PROYECTO
 
+Repo: `github.com/GLSchiaffino/ATENAS-software` (rama `main`)
+
 ```
-/
-├── docs/
-│   ├── 01-especificacion-funcional/
-│   │   └── ATENAS_EF_v1.0.md
-│   ├── 02-modelo-dominio/
-│   │   └── (diagramas en DBeaver — pendiente exportar)
-│   ├── 03-base-de-datos/
-│   │   ├── schema.sql          ← v1.4 | 732 líneas | 27 tablas | 16 ENUMs
-│   │   ├── seeds.sql           ← v1.4 | países + 4 equipos admin semilla
-│   │   └── schema_oracle.sql   ← versión Oracle para SQL Developer Data Modeler
-│   └── 04-api-rest/
-│       └── (pendiente documentar endpoints formalmente)
-├── ATENAS_Handoff_v2.md        ← este archivo
-└── ATENAS_Guia_Aprendizaje.md  ← guía de aprendizaje completa (815 líneas)
+ATENAS-software/
+├── README.md                     ← README principal (descripción, stack, setup)
+├── LICENSE
+├── backend/                      ← proyecto Spring Boot
+│   ├── build.gradle
+│   ├── gradlew / gradlew.bat
+│   ├── .gitignore                ← ignora build/, .idea/, application-local.yml
+│   └── src/
+│       ├── main/
+│       │   ├── java/com/atenas/backend/
+│       │   │   └── BackendApplication.java
+│       │   └── resources/
+│       │       ├── application.yml         ← config base (al repo, sin secretos)
+│       │       ├── application-local.yml   ← credenciales (NO al repo, ignorado)
+│       │       ├── static/
+│       │       └── templates/
+│       └── test/
+└── docs/
+    ├── 01-especificacion-funcional/
+    │   └── ATENAS_Especificacion_Funcional_v1.0.md
+    ├── 02-modelo-dominio/
+    │   ├── atenas_erd_final_v2.html
+    │   ├── atenas_erd_diagrams.html
+    │   ├── atenas_erd_diagram2_zoom.html
+    │   └── atenas_flujo_venta.svg
+    ├── 03-base-de-datos/
+    │   ├── schema.sql            ← v1.4 vigente | 27 tablas | 16 ENUMs
+    │   ├── seeds.sql             ← v1.4
+    │   ├── schema_oracle.sql
+    │   ├── diagramas/            ← PNG del circuito de venta, estructura comercial, inventario
+    │   └── historico/           ← v1.1 y v1.3 archivadas (evolución de diseño)
+    ├── 04-api-rest/
+    │   └── auth_silent_refresh_flow.svg
+    ├── 05-guia-aprendizaje/
+    │   └── ATENAS_Guia_Aprendizaje.md   ← incluye FASE 4 (Spring Boot, IoC, secretos)
+    ├── handoff/
+    │   └── ATENAS_Handoff_v3.md         ← este archivo
+    └── presentacion/
+        ├── presentacion_atenas.html
+        └── presentacion_atenas_celular.html
 ```
+
+**Nota sobre reorganización:** El repo fue reestructurado de carpetas-por-tipo a carpetas-por-etapa. Se eliminó andamiaje interno (handoff v1, prompts de contexto de ChatGPT, PDFs internos). Se conservaron las versiones históricas de BD (v1.1, v1.3) para mostrar la evolución del diseño.
 
 ---
 
-## PRÓXIMA ETAPA — Implementación
+## ESTADO DE IMPLEMENTACIÓN (Etapa 5)
 
-Lo que falta antes de escribir código:
+### Stack confirmado
 
-### 1. Selección de Stack (pendiente de decisión)
-Opciones comunes para este tipo de proyecto:
+| Capa | Tecnología | Notas |
+|---|---|---|
+| Runtime | Java 21 (LTS) | JDK 21 descargado vía IntelliJ (Temurin/MS). Sistema tiene Java 17 en PATH — conviven sin conflicto |
+| Framework | Spring Boot 4.1.0 | — |
+| ORM | Spring Data JPA + Hibernate 7.4 | `ddl-auto: validate` (schema.sql es la fuente de verdad, Hibernate NO modifica la BD) |
+| Seguridad | Spring Security + JWT | Configuración pendiente (Bloque 3). Por ahora Security activo con login autogenerado |
+| Validación | Bean Validation | — |
+| Excel | Apache POI | Pendiente (módulo Portal Clínicas) |
+| Cron | Spring `@Scheduled` | Pendiente (semana_laboral) |
+| Build | Gradle (Groovy DSL) | — |
+| BD | PostgreSQL 15 (Docker) | Contenedor `postgres-atenas`, puerto 5432, credenciales atenas/123456/atenas |
+| IDE | IntelliJ IDEA | Recomendado por soporte Java/Spring superior |
+| Lombok | Sí | ⚠️ REGLA: `@Data` solo en DTOs, NUNCA en entities (rompe con FK circular y lazy loading) |
 
-| Capa | Opciones |
-|---|---|
-| Backend | Node.js + Express/Fastify · Python + FastAPI · Java + Spring Boot |
-| Frontend | React · Vue · Angular |
-| ORM | Prisma (Node) · SQLAlchemy (Python) · Hibernate (Java) |
-| Auth | JWT + bcrypt |
-| Storage imágenes | S3 / Cloudinary / filesystem local |
-| Cron jobs | node-cron · APScheduler · Spring Scheduler |
+### Estructura de paquetes objetivo
 
-### 2. Estructura del proyecto backend
-- Carpetas: routes, controllers, services, middlewares, models
-- Middleware de autenticación (verifica JWT en cada request)
-- Middleware de RBAC (verifica rol contra endpoint)
-- Manejo centralizado de errores
+```
+com.atenas.backend/
+├── config/       → SecurityConfig, CorsConfig, JwtConfig
+├── controller/   → un controller por módulo
+├── service/      → lógica de negocio (los 19 pasos viven acá)
+├── repository/   → interfaces JPA (una por entidad)
+├── entity/       → clases JPA (mapeadas al schema v1.4)
+├── dto/          → request/response (NUNCA exponer entities)
+│   ├── request/
+│   └── response/
+├── exception/    → excepciones custom + GlobalExceptionHandler
+├── scheduler/    → cron de semana_laboral
+└── util/         → JwtUtil, generador código EF-YYYYMMDD-NNNNN
+```
 
-### 3. Orden de implementación sugerido
-1. Setup del proyecto + conexión a BD
-2. Middleware auth + endpoints /auth/*
-3. Módulo Ventas (POST /ventas es el más complejo — validar primero)
-4. Módulo Validación
-5. Dashboard
-6. Comisiones y Pagos
-7. Campañas e Inventario
-8. ABM
-9. Portal Clínicas
-10. Testing + documentación
+### Decisiones de configuración tomadas
+
+| ID | Decisión | Resolución |
+|---|---|---|
+| IMP-01 | Formato de config | YAML (`application.yml`), no `.properties` — estándar moderno |
+| IMP-02 | Gestión de secretos | `application.yml` (al repo, lee variables) + `application-local.yml` (ignorado por Git, credenciales reales) |
+| IMP-03 | Zona horaria | UTC forzado vía `-Duser.timezone=UTC` (VM option). El contenedor postgres:15 no reconocía America/Buenos_Aires. Decisión de fondo: UTC en BD, conversión a hora local en presentación (soporte multi-país CLP/ARS) |
+| IMP-04 | Storage de imágenes | Filesystem local para MVP, con interfaz abstracta (StorageService) para migrar a S3 después sin tocar el resto |
+| IMP-05 | ddl-auto | `validate` — Hibernate verifica entities contra tablas pero no modifica el schema |
+
+### Progreso por bloques de implementación
+
+```
+✅ BLOQUE 0 — Setup y conexión a BD              COMPLETADO
+   · Proyecto Spring Boot creado (Spring Initializr)
+   · Dependencias: Web, JPA, PostgreSQL, Security, Validation, Lombok
+   · .gitignore configurado (build/, .idea/, secretos)
+   · Conexión a PostgreSQL exitosa
+   · App arranca: "Started BackendApplication" en puerto 8080
+   · Commiteado y pusheado a GitHub
+
+⬜ BLOQUE 1 — Estructura + primer endpoint        ← PRÓXIMO
+   · @RestController: GET /v1/health
+   · Envelope de respuesta estándar { success, data, message }
+   · SecurityConfig: permitir /v1/health sin login (primer roce con Security)
+   · Ver JSON en navegador
+
+⬜ BLOQUE 2 — Entities JPA (27 tablas)            ← acá ENTRA Claude Code
+   · Explicar @Entity, @Id, @ManyToOne con 1-2 entities en chat
+   · Manejar FK circular equipo ↔ usuario
+   · Una vez entendido el patrón → Claude Code genera las 25 restantes
+
+⬜ BLOQUE 3 — Auth + Spring Security              ← lo más didáctico, NO delegar
+   · JWT: generación, validación, cookies HttpOnly
+   · Los 4 endpoints /auth/*
+   · Middleware RBAC por rol
+
+⬜ BLOQUE 4 — Módulo Ventas
+   · POST /ventas: los 19 pasos, @Transactional (análisis detallado pendiente)
+   · GET /ventas con filtros RBAC
+
+⬜ BLOQUES 5-9 — Resto de módulos (varios con Claude Code para CRUD repetitivo)
+⬜ BLOQUE 10 — Testing + documentación
+```
+
+### Estrategia de uso de Claude Code
+
+Regla acordada: **Claude Code para lo repetitivo una vez que el usuario entiende el patrón. Claude chat para conceptos nuevos y lógica compleja.**
+- Entra por primera vez en el **Bloque 2** (entities), después de hacer 1-2 entities juntos en el chat.
+- Vuelve en los **Bloques 5-9** para el CRUD repetitivo del ABM.
+- NO se usa para Spring Security (Bloque 3) ni para el POST /ventas (Bloque 4) — esos requieren entender primero.
+
+### Riesgos técnicos identificados (a vigilar durante implementación)
+
+1. **`@Transactional` del POST /ventas:** 19 pasos en una transacción. Cuidado con qué excepciones disparan rollback. Análisis detallado pendiente para el Bloque 4.
+2. **FK circular equipo ↔ usuario:** usar DTOs para evitar serialización circular. NUNCA `@Data` ni `@ToString` en estas entities.
+3. **N+1 queries en dashboard:** diseñar los `@Query` con `JOIN FETCH` desde el principio. Explicar el problema en detalle cuando se llegue al dashboard.
 
 ---
 
@@ -280,8 +374,34 @@ Opciones comunes para este tipo de proyecto:
 | ID | Punto | Impacto |
 |---|---|---|
 | PD-001 | Datos exactos del Excel exportado a clínicas (confirmar con gerencia) | RF-027 — ajuste menor antes de implementar |
-| PD-002 | Exportar diagramas ER de DBeaver como imágenes | Documentación técnica |
-| PD-003 | Diagrama ComisionesYPagos pendiente de revisión visual en DBeaver | Validar relaciones del circuito 4 |
+| PD-002 | Exportar diagramas ER de DBeaver y commitearlos al repo | Documentación técnica — ver instrucciones abajo |
+
+### PD-002 — Dónde guardar los diagramas de DBeaver
+
+**Desde DBeaver:**
+Click derecho en el canvas del diagrama → **Save Diagram as Image** → PNG
+
+**Carpeta destino en el repo:**
+```
+docs/
+└── 02-modelo-dominio/
+    ├── diagrama_01_circuito_venta.png
+    ├── diagrama_02_estructura_comercial.png
+    ├── diagrama_03_inventario_sistema.png
+    └── diagrama_04_comisiones_pagos.png
+```
+
+**Los 4 grupos de tablas por diagrama:**
+1. CircuitoVenta: `cliente`, `venta`, `jornada_vendedor`, `imagen_venta`, `jornada_diaria`, `usuario`, `semana_laboral`, `traspaso_venta`
+2. EstructuraComercial: `punto_de_venta`, `ciudad`, `pais`, `asignacion_equipo_punto`, `equipo`, `clinica`, `cupon`, `usuario`
+3. InventarioSistema: `juego`, `premio_juego`, `log_auditoria`, `notificacion_interna`, `registro_juego`, `usuario`, `cupon`, `movimiento_cupon`, `lote_ingreso_cupones`
+4. ComisionesYPagos: `rendicion_efectivo`, `semana_laboral`, `premio_juego`, `usuario`, `pago_vendedor`, `umbral_lider`, `tabla_comision`, `registro_comision`
+
+Commitear con:
+```bash
+git add docs/02-modelo-dominio/
+git commit -m "docs(diagrams): diagramas ER por circuito exportados desde DBeaver"
+```
 
 ---
 
@@ -291,20 +411,20 @@ Opciones comunes para este tipo de proyecto:
 2. Iniciar la conversación con este prompt:
 
 ```
-Leé el archivo ATENAS_Handoff_v2.md antes de responder.
-Somos el proyecto ATENAS Software. Ya completamos:
-- Especificación funcional
-- Modelo de dominio
-- Base de datos (schema v1.4, PostgreSQL)
-- Diseño de API REST (todos los módulos)
+Leé el archivo ATENAS_Handoff_v3.md antes de responder.
+Somos el proyecto ATENAS Software. Ya completamos el diseño
+(especificación, dominio, BD schema v1.4, API REST) y arrancamos
+la implementación del backend en Spring Boot.
 
-Próxima etapa: [DESCRIBIR LO QUE QUERÉS HACER]
+Estado: Bloque 0 completado (proyecto creado, conectado a PostgreSQL,
+corriendo en puerto 8080). Próximo: Bloque 1 (primer endpoint /v1/health).
 
-Recordá las reglas: dar opinión breve ante mis sugerencias,
-explicar conceptos nuevos, mantener consistencia entre documentos.
+Seguimos en MODO PROFESOR: explicame los conceptos nuevos de Spring
+como si no supiera nada, con respuestas concisas. Recordá las reglas:
+opinión breve ante mis sugerencias, consistencia entre documentos.
 ```
 
 ---
 
-*Handoff v2.0 — Generado al cierre de la Etapa de Diseño de API REST.*
-*Próxima etapa: Selección de stack e implementación del backend.*
+*Handoff v3.0 — Generado al cierre del Bloque 0 de implementación.*
+*Próximo hito: Bloque 1 — primer endpoint REST (/v1/health) + envelope de respuesta + primer roce con SecurityConfig.*
