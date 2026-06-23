@@ -1,7 +1,7 @@
 # ATENAS Software — Estado del Proyecto y Contexto de Continuación
-## Documento de Handoff v3.0
+## Documento de Handoff v4.0
 > Subir este archivo a las fuentes del proyecto en Claude para contextualizar nuevas conversaciones.
-> Versión anterior: Handoff v2.0 (obsoleto — reemplazado por este documento)
+> Versión anterior: Handoff v3.0 (obsoleto — reemplazado por este documento)
 
 ---
 
@@ -238,7 +238,14 @@ ATENAS-software/
 │   └── src/
 │       ├── main/
 │       │   ├── java/com/atenas/backend/
-│       │   │   └── BackendApplication.java
+│       │   │   ├── BackendApplication.java
+│       │   │   ├── config/
+│       │   │   │   └── SecurityConfig.java        ← Bloque 1: filter chain base
+│       │   │   ├── controller/
+│       │   │   │   └── HealthController.java       ← Bloque 1: GET /v1/health
+│       │   │   └── dto/
+│       │   │       └── response/
+│       │   │           └── ApiResponse.java        ← Bloque 1: envelope genérico
 │       │   └── resources/
 │       │       ├── application.yml         ← config base (al repo, sin secretos)
 │       │       ├── application-local.yml   ← credenciales (NO al repo, ignorado)
@@ -264,7 +271,7 @@ ATENAS-software/
     ├── 05-guia-aprendizaje/
     │   └── ATENAS_Guia_Aprendizaje.md   ← incluye FASE 4 (Spring Boot, IoC, secretos)
     ├── handoff/
-    │   └── ATENAS_Handoff_v3.md         ← este archivo
+    │   └── ATENAS_Handoff_v4.md         ← este archivo
     └── presentacion/
         ├── presentacion_atenas.html
         └── presentacion_atenas_celular.html
@@ -318,6 +325,8 @@ com.atenas.backend/
 | IMP-03 | Zona horaria | UTC forzado vía `-Duser.timezone=UTC` (VM option). El contenedor postgres:15 no reconocía America/Buenos_Aires. Decisión de fondo: UTC en BD, conversión a hora local en presentación (soporte multi-país CLP/ARS) |
 | IMP-04 | Storage de imágenes | Filesystem local para MVP, con interfaz abstracta (StorageService) para migrar a S3 después sin tocar el resto |
 | IMP-05 | ddl-auto | `validate` — Hibernate verifica entities contra tablas pero no modifica el schema |
+| IMP-06 | Envelope de respuesta | `ApiResponse<T>` genérico con constructor privado + métodos de fábrica estáticos (`ok`, `error`). `@JsonInclude(NON_NULL)` para omitir campos null. Lombok `@Getter` (Jackson necesita getters). Toda la API responde con este envelope |
+| IMP-07 | Reglas de Security iniciales | Filter chain con CSRF disabled (API REST, no formularios), sesiones STATELESS (preparado para JWT), `/v1/health` y `/v1/auth/**` públicos vía `permitAll()`. El resto exige autenticación. El login básico autogenerado se elimina en el Bloque 3 |
 
 ### Progreso por bloques de implementación
 
@@ -330,13 +339,16 @@ com.atenas.backend/
    · App arranca: "Started BackendApplication" en puerto 8080
    · Commiteado y pusheado a GitHub
 
-⬜ BLOQUE 1 — Estructura + primer endpoint        ← PRÓXIMO
-   · @RestController: GET /v1/health
-   · Envelope de respuesta estándar { success, data, message }
-   · SecurityConfig: permitir /v1/health sin login (primer roce con Security)
-   · Ver JSON en navegador
+✅ BLOQUE 1 — Estructura + primer endpoint        COMPLETADO
+   · ApiResponse<T>: envelope genérico { success, data, message, errorCode, errors }
+     con métodos de fábrica estáticos y @JsonInclude(NON_NULL)
+   · HealthController: GET /v1/health → JSON con status UP
+   · SecurityConfig: filter chain con /v1/health y /v1/auth/** públicos,
+     CSRF disabled, sesiones STATELESS (preparado para JWT)
+   · Verificado en navegador: JSON correcto, sin login
+   · Estructura de paquetes creada: dto/response, controller, config
 
-⬜ BLOQUE 2 — Entities JPA (27 tablas)            ← acá ENTRA Claude Code
+⬜ BLOQUE 2 — Entities JPA (27 tablas)            ← PRÓXIMO — acá ENTRA Claude Code
    · Explicar @Entity, @Id, @ManyToOne con 1-2 entities en chat
    · Manejar FK circular equipo ↔ usuario
    · Una vez entendido el patrón → Claude Code genera las 25 restantes
@@ -411,13 +423,17 @@ git commit -m "docs(diagrams): diagramas ER por circuito exportados desde DBeave
 2. Iniciar la conversación con este prompt:
 
 ```
-Leé el archivo ATENAS_Handoff_v3.md antes de responder.
+Leé el archivo ATENAS_Handoff_v4.md antes de responder.
 Somos el proyecto ATENAS Software. Ya completamos el diseño
-(especificación, dominio, BD schema v1.4, API REST) y arrancamos
-la implementación del backend en Spring Boot.
+(especificación, dominio, BD schema v1.4, API REST) y estamos
+implementando el backend en Spring Boot.
 
-Estado: Bloque 0 completado (proyecto creado, conectado a PostgreSQL,
-corriendo en puerto 8080). Próximo: Bloque 1 (primer endpoint /v1/health).
+Estado: Bloques 0 y 1 completados (proyecto creado, conectado a
+PostgreSQL, corriendo en puerto 8080; primer endpoint /v1/health
+funcionando con envelope ApiResponse<T> y SecurityConfig base).
+Próximo: Bloque 2 — entidades JPA (mapeo Entity ↔ tabla, FK circular
+equipo ↔ usuario). Hacemos 1-2 entities juntos en el chat y después
+delego las 25 restantes a Claude Code.
 
 Seguimos en MODO PROFESOR: explicame los conceptos nuevos de Spring
 como si no supiera nada, con respuestas concisas. Recordá las reglas:
@@ -426,5 +442,5 @@ opinión breve ante mis sugerencias, consistencia entre documentos.
 
 ---
 
-*Handoff v3.0 — Generado al cierre del Bloque 0 de implementación.*
-*Próximo hito: Bloque 1 — primer endpoint REST (/v1/health) + envelope de respuesta + primer roce con SecurityConfig.*
+*Handoff v4.0 — Generado al cierre del Bloque 1 de implementación.*
+*Próximo hito: Bloque 2 — Entidades JPA (mapeo Entity ↔ tabla, FK circular equipo ↔ usuario, entrada de Claude Code para generar las entities repetitivas).*

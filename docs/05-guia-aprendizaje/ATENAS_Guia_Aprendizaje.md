@@ -151,3 +151,115 @@ Solo contiene consultas a la BD. Ninguna lógica de negocio. Si necesitás decid
 - Comparar `@Query` JPQL vs SQL nativo: cuándo usar cada uno
 - `Optional<T>` como patrón: cómo evitar NullPointerException al buscar por ID
 - Constructor Injection vs `@Autowired` en campo: por qué el constructor es la forma recomendada en Spring Boot 3.x
+
+---
+
+## 4.5 — El primer endpoint: envelope, `@RestController` y Spring Security
+
+Esta sección documenta el Bloque 1: el primer endpoint REST funcionando (`GET /v1/health`).
+
+### El envelope de respuesta (DTO genérico)
+
+**¿Qué es un DTO?** *Data Transfer Object*. Una clase que solo transporta datos: sin lógica, sin anotaciones JPA, sin nada del dominio. Es lo que los endpoints reciben y devuelven.
+
+**Regla de oro:** nunca exponer una `@Entity` directo en un endpoint. Rompe la separación de capas y puede filtrar campos que no deben salir (como `password_hash`). Siempre se traduce Entity → DTO antes de responder.
+
+**El envelope** es un DTO que envuelve *toda* respuesta de la API con una estructura uniforme. En ATENAS:
+
+```java
+@Getter
+@JsonInclude(JsonInclude.Include.NON_NULL)  // omite del JSON los campos null
+public class ApiResponse<T> {
+    private final boolean success;
+    private final T data;
+    private final String message;
+    private final String errorCode;
+    private final Object errors;
+
+    private ApiResponse(...) { ... }  // constructor privado
+
+    // Métodos estáticos de fábrica — la única forma de crear un ApiResponse
+    public static <T> ApiResponse<T> ok(T data) { ... }
+    public static <T> ApiResponse<T> ok(T data, String message) { ... }
+    public static ApiResponse<Void> error(String message, String errorCode) { ... }
+}
+```
+
+**Conceptos clave del envelope:**
+
+| Concepto | Qué hace | Por qué |
+|---|---|---|
+| `<T>` (genérico) | El campo `data` puede ser de cualquier tipo | El mismo envelope sirve para devolver una venta, una lista, un mapa, etc. |
+| Constructor privado + métodos estáticos | Nadie hace `new ApiResponse(...)` | Fuerza a crear respuestas solo de formas válidas y legibles: `ApiResponse.ok(data)` |
+| `@JsonInclude(NON_NULL)` | Jackson omite campos `null` del JSON | Las respuestas exitosas no muestran `errorCode: null`, los errores no muestran `data: null` |
+| `@Getter` (Lombok) | Genera los getters automáticamente | Jackson necesita getters para serializar a JSON. **Sin getters, el JSON sale vacío `{}`** |
+
+### `@RestController` vs MVC clásico
+
+```java
+@RestController          // = @Controller + @ResponseBody
+@RequestMapping("/v1")   // prefijo base para todos los endpoints de esta clase
+public class HealthController {
+
+    @GetMapping("/health")   // mapea GET /v1/health
+    public ApiResponse<Map<String, String>> health() {
+        return ApiResponse.ok(data, "Sistema operativo");
+    }
+}
+```
+
+`@RestController` combina dos anotaciones:
+- `@Controller` → Spring registra la clase como componente web que maneja requests HTTP.
+- `@ResponseBody` → el valor de retorno se serializa a JSON automáticamente (lo hace Jackson, incluido en `spring-boot-starter-web`).
+
+**La diferencia con el MVC clásico:** sin `@ResponseBody`, Spring interpretaría el retorno como el *nombre de una vista* (un archivo HTML a renderizar). Con `@RestController`, siempre se devuelve el objeto serializado a JSON. Para una API REST, siempre `@RestController`.
+
+### Spring Security: el filter chain
+
+**El concepto mental:** Spring Security es un portero que intercepta *cada* request HTTP **antes** de que llegue a tu controller. Por defecto, ese portero bloquea todo y redirige a un formulario de login. Por eso, apenas agregás la dependencia de Security, todos los endpoints quedan protegidos sin que hagas nada.
+
+`SecurityConfig` define las **reglas del portero**:
+
+```java
+@Configuration       // Spring lee esta clase como fuente de configuración al arrancar
+@EnableWebSecurity
+public class SecurityConfig {
+
+    @Bean   // el objeto que retorna este método se registra en el contenedor IoC
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf(csrf -> csrf.disable())
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/v1/health", "/v1/auth/**").permitAll()
+                .anyRequest().authenticated()
+            );
+        return http.build();
+    }
+}
+```
+
+**Las tres decisiones de este bloque:**
+
+| Línea | Qué hace | Por qué en ATENAS |
+|---|---|---|
+| `csrf.disable()` | Desactiva la protección CSRF | CSRF es un ataque específico de formularios HTML. Una API REST con tokens/cookies HttpOnly no lo necesita |
+| `sessionCreationPolicy(STATELESS)` | Security no crea ni busca sesiones HTTP | Cada request se autentica solo con su JWT (Bloque 3). No hay estado de sesión en el servidor |
+| `authorizeHttpRequests(...)` | Define qué endpoints son públicos y cuáles requieren login | `/v1/health` y `/v1/auth/**` quedan públicos; todo lo demás exige autenticación |
+
+**Importante sobre el orden:** las reglas dentro de `authorizeHttpRequests` se evalúan de arriba hacia abajo. La primera que coincide gana. Por eso los `permitAll()` específicos van **antes** del `anyRequest().authenticated()` general.
+
+**Nota sobre el log de arranque:** mientras no haya autenticación JWT implementada, Spring Boot sigue mostrando `Using generated security password: ...` al arrancar. No es un error: es el fallback de login básico de Security. El endpoint público funciona igual. Se elimina del todo en el Bloque 3 al reemplazar el mecanismo de autenticación por JWT.
+
+---
+
+### 🔖 Para explorar después del Bloque 1
+- Métodos de fábrica estáticos (*static factory methods*) vs constructores públicos: por qué Effective Java los recomienda
+- Genéricos en Java (`<T>`): variancia, wildcards (`? extends`, `? super`)
+- El orden de los filtros en la `SecurityFilterChain`: qué filtros corren antes y después del de autorización
+- `application.yml`: bajar el nivel de log de Security con `logging.level.org.springframework.security: WARN`
+
+---
+
+*Fin de la Fase 4 — actualizada al cierre del Bloque 1.*
+*Próximo: Fase 4.6 — Entidades JPA (mapeo Entity ↔ tabla, FK circular equipo ↔ usuario).*

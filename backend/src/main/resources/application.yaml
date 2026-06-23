@@ -18,7 +18,7 @@ spring:
   # La sintaxis ${VARIABLE:valor_por_defecto} significa:
   #   "usa la variable de entorno VARIABLE; si no existe, usa el valor por defecto"
   datasource:
-    url: ${ATENAS_DB_URL:jdbc:postgresql://localhost:5432/atenas}
+    url: ${ATENAS_DB_URL:jdbc:postgresql://localhost:5432/atenas?connectionTimeZone=UTC}
     username: ${ATENAS_DB_USER:atenas}
     password: ${ATENAS_DB_PASS:}
     driver-class-name: org.postgresql.Driver
